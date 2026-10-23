@@ -5591,17 +5591,6 @@ static int abox_modem_notifier(struct notifier_block *nb,
 static int abox_itmon_notifier(struct notifier_block *nb,
 		unsigned long action, void *nb_data)
 {
-	struct abox_data *data = container_of(nb, struct abox_data, itmon_nb);
-	struct device *dev = &data->pdev->dev;
-	struct itmon_notifier *itmon_data = nb_data;
-
-	if (itmon_data && itmon_data->dest && (strncmp("ABOX", itmon_data->dest,
-			sizeof("ABOX") - 1) == 0)) {
-		dev_info(dev, "%s(%lu)\n", __func__, action);
-		data->enabled = false;
-		return NOTIFY_OK;
-	}
-
 	return NOTIFY_DONE;
 }
 

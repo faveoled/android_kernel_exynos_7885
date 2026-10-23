@@ -21,13 +21,9 @@
 
 #define SCSC_MULTI_RF_CHIP_ID /* Select FW by RF chip ID, not rev */
 
-#if defined(CONFIG_SCSC_CORE_FW_LOCATION) && !defined(CONFIG_SCSC_CORE_FW_LOCATION_AUTO)
 #define MX140_FW_BASE_DIR_SYSTEM_ETC_WIFI      CONFIG_SCSC_CORE_FW_LOCATION
 #define MX140_FW_BASE_DIR_VENDOR_ETC_WIFI      CONFIG_SCSC_CORE_FW_LOCATION
-#else
-#define MX140_FW_BASE_DIR_SYSTEM_ETC_WIFI	"/system/etc/wifi"
-#define MX140_FW_BASE_DIR_VENDOR_ETC_WIFI	"/vendor/etc/wifi"
-#endif
+
 
 /* Paths for vendor utilities, used when CONFIG_SCSC_CORE_FW_LOCATION_AUTO=n */
 #define MX140_EXE_DIR_VENDOR		"/vendor/bin"    /* Oreo */
@@ -520,26 +516,6 @@ int mx140_basedir_file(struct scsc_mx *mx)
 	fs = get_fs();
 	/* Set to kernel segment. */
 	set_fs(get_ds());
-
-	/* If /system isn't present, assume platform isn't ready yet */
-	r = vfs_stat("/system", &stat);
-	if (r != 0) {
-		SCSC_TAG_ERR(MX_FILE, "/system not mounted yet\n");
-		r = -EAGAIN;
-		goto done;
-	}
-
-	/* If /vendor isn't present, assume platform isn't ready yet.
-	 * Android M and N still have /vendor, though we don't use it.
-	 */
-	r = vfs_stat("/vendor", &stat);
-	if (r != 0) {
-		SCSC_TAG_ERR(MX_FILE, "/vendor not mounted yet\n");
-		r = -EAGAIN;
-		goto done;
-	}
-
-	/* Now partitions are mounted, so let's see what's in them. */
 
 	/* Try /vendor partition  (post-Oreo) */
 	strlcpy(base_dir, MX140_FW_BASE_DIR_VENDOR_ETC_WIFI, sizeof(base_dir));

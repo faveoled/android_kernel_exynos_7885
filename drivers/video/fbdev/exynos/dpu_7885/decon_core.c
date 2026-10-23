@@ -703,11 +703,15 @@ err:
 	return ret;
 }
 
+int decon_set_vsync_int(struct fb_info *info, bool active);
+extern int needs_pan;
+
 static int decon_blank(int blank_mode, struct fb_info *info)
 {
 	struct decon_win *win = info->par;
 	struct decon_device *decon = win->decon;
 	int ret = 0;
+	struct fb_info *fb_info;
 
 	decon_info("%s + blank_mode: %d, decon-%d %s mode: %dtype (0: DSI, 1: eDP, 2:DP, 3: WB)\n",
 			__func__, blank_mode,
@@ -741,6 +745,10 @@ static int decon_blank(int blank_mode, struct fb_info *info)
 			goto blank_exit;
 		}
 		atomic_set(&decon->ffu_flag, 2);
+
+		needs_pan = true;
+		fb_info = decon->win[decon->dt.dft_win]->fbinfo;
+		decon_set_vsync_int(fb_info, true);
 		break;
 	case FB_BLANK_VSYNC_SUSPEND:
 	case FB_BLANK_HSYNC_SUSPEND:
@@ -2152,18 +2160,6 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 	return ret;
 }
 
-static ssize_t decon_fb_read(struct fb_info *info, char __user *buf,
-		size_t count, loff_t *ppos)
-{
-	return 0;
-}
-
-static ssize_t decon_fb_write(struct fb_info *info, const char __user *buf,
-		size_t count, loff_t *ppos)
-{
-	return 0;
-}
-
 int decon_release(struct fb_info *info, int user)
 {
 	struct decon_win *win = info->par;
@@ -2217,12 +2213,12 @@ static struct fb_ops decon_fb_ops = {
 	.fb_blank	= decon_blank,
 	.fb_setcolreg	= decon_setcolreg,
 	.fb_fillrect    = cfb_fillrect,
+	.fb_copyarea    = cfb_copyarea,
+	.fb_imageblit   = cfb_imageblit,
 #ifdef CONFIG_COMPAT
 	.fb_compat_ioctl = decon_compat_ioctl,
 #endif
 	.fb_ioctl	= decon_ioctl,
-	.fb_read	= decon_fb_read,
-	.fb_write	= decon_fb_write,
 	.fb_pan_display	= decon_pan_display,
 	.fb_mmap	= decon_mmap,
 	.fb_release	= decon_release,
@@ -2532,6 +2528,7 @@ static int decon_acquire_window(struct decon_device *decon, int idx)
 	}
 
 	fbinfo->fix.type	= FB_TYPE_PACKED_PIXELS;
+	fbinfo->fix.visual	= FB_VISUAL_TRUECOLOR,
 	fbinfo->fix.accel	= FB_ACCEL_NONE;
 	fbinfo->var.activate	= FB_ACTIVATE_NOW;
 	fbinfo->var.vmode	= FB_VMODE_NONINTERLACED;
@@ -2846,7 +2843,7 @@ static int decon_initial_display(struct decon_device *decon, bool is_colormap)
 		decon->bts.ops->bts_update_qos_disp(decon, decon->dt.disp_freq);
 
 	decon_to_init_param(decon, &p);
-#if !defined(BRINGUP_DECON_BIST)
+#if 0// !defined(BRINGUP_DECON_BIST)
 	if (decon_reg_init(decon->id, decon->dt.out_idx[0], &p) < 0)
 		goto decon_init_done;
 #else
@@ -2879,7 +2876,7 @@ static int decon_initial_display(struct decon_device *decon, bool is_colormap)
 	set_bit(decon->dt.dft_idma, &decon->prev_used_dpp);
 	memset(&config, 0, sizeof(struct decon_win_config));
 	config.dpp_parm.addr[0] = fbinfo->fix.smem_start;
-	config.format = DECON_PIXEL_FORMAT_BGRA_8888;
+	config.format = DECON_PIXEL_FORMAT_ARGB_8888;
 	config.src.w = fbinfo->var.xres;
 	config.src.h = fbinfo->var.yres;
 	config.src.f_w = fbinfo->var.xres;
@@ -2922,10 +2919,11 @@ static int decon_initial_display(struct decon_device *decon, bool is_colormap)
 	call_panel_ops(dsim, displayon, dsim);
 	decon_reg_start(decon->id, &psr);
 	decon_wait_for_vsync(decon, VSYNC_TIMEOUT_MSEC);
+	decon_set_vsync_int(fbinfo, true);
 	if (decon_reg_wait_update_done_and_mask(decon->id, &psr,
 				SHADOW_UPDATE_TIMEOUT) < 0)
 		decon_err("%s: wait_for_update_timeout\n", __func__);
-#if !defined(BRINGUP_DECON_BIST)
+#if 0 //!defined(BRINGUP_DECON_BIST)
 decon_init_done:
 #endif
 	decon->state = DECON_STATE_INIT;
